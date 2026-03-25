@@ -1,10 +1,8 @@
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
-// Custom Exception for Invalid Booking
-class InvalidBookingException extends Exception {
-    public InvalidBookingException(String message) {
+// Custom exception for invalid cancellation
+class InvalidCancellationException extends Exception {
+    public InvalidCancellationException(String message) {
         super(message);
     }
 }
@@ -13,77 +11,115 @@ class InvalidBookingException extends Exception {
 class Reservation {
     private String guestName;
     private String roomType;
+    private String roomID;
 
-    public Reservation(String guestName, String roomType) throws InvalidBookingException {
-        if (guestName == null || guestName.isEmpty()) {
-            throw new InvalidBookingException("Guest name cannot be empty!");
-        }
-        if (!roomType.equalsIgnoreCase("Standard") &&
-                !roomType.equalsIgnoreCase("Deluxe") &&
-                !roomType.equalsIgnoreCase("Suite")) {
-            throw new InvalidBookingException("Invalid room type! Choose Standard, Deluxe, or Suite.");
-        }
+    public Reservation(String guestName, String roomType, String roomID) {
         this.guestName = guestName;
         this.roomType = roomType;
+        this.roomID = roomID;
+    }
+
+    public String getGuestName() {
+        return guestName;
+    }
+
+    public String getRoomType() {
+        return roomType;
+    }
+
+    public String getRoomID() {
+        return roomID;
     }
 
     @Override
     public String toString() {
-        return "Guest: " + guestName + ", Room Type: " + roomType;
+        return "Guest: " + guestName + ", Room: " + roomType + ", ID: " + roomID;
     }
 }
 
-// Booking system with error handling
+// Booking system with cancellation and rollback
 class BookingSystem {
     private List<Reservation> reservations;
-    private int standardRooms;
-    private int deluxeRooms;
-    private int suiteRooms;
+    private Map<String, Integer> inventory; // room type -> count
+    private Stack<String> cancelledRoomIDs; // tracks last cancelled rooms
 
-    public BookingSystem(int standardRooms, int deluxeRooms, int suiteRooms) {
+    public BookingSystem(int standard, int deluxe, int suite) {
         reservations = new ArrayList<>();
-        this.standardRooms = standardRooms;
-        this.deluxeRooms = deluxeRooms;
-        this.suiteRooms = suiteRooms;
+        inventory = new HashMap<>();
+        inventory.put("Standard", standard);
+        inventory.put("Deluxe", deluxe);
+        inventory.put("Suite", suite);
+        cancelledRoomIDs = new Stack<>();
     }
 
+    // Add a reservation
     public void addReservation(String guestName, String roomType) {
+        int available = inventory.getOrDefault(roomType, 0);
+        if (available <= 0) {
+            System.out.println("No " + roomType + " rooms available!");
+            return;
+        }
+
+        // Generate a simple room ID
+        String roomID = roomType.substring(0, 1).toUpperCase() + (available);
+        Reservation res = new Reservation(guestName, roomType, roomID);
+        reservations.add(res);
+        inventory.put(roomType, available - 1);
+
+        System.out.println("Booking confirmed: " + res);
+    }
+
+    // Cancel a reservation
+    public void cancelReservation(String guestName, String roomID) {
         try {
-            // Validate inventory
-            if (roomType.equalsIgnoreCase("Standard") && standardRooms <= 0) {
-                throw new InvalidBookingException("No Standard rooms available!");
-            }
-            if (roomType.equalsIgnoreCase("Deluxe") && deluxeRooms <= 0) {
-                throw new InvalidBookingException("No Deluxe rooms available!");
-            }
-            if (roomType.equalsIgnoreCase("Suite") && suiteRooms <= 0) {
-                throw new InvalidBookingException("No Suite rooms available!");
+            Reservation toCancel = null;
+            for (Reservation r : reservations) {
+                if (r.getGuestName().equalsIgnoreCase(guestName) &&
+                        r.getRoomID().equalsIgnoreCase(roomID)) {
+                    toCancel = r;
+                    break;
+                }
             }
 
-            // Create reservation (validates guest and room type)
-            Reservation reservation = new Reservation(guestName, roomType);
-            reservations.add(reservation);
+            if (toCancel == null) {
+                throw new InvalidCancellationException(
+                        "Cancellation failed: No matching reservation found for " + guestName + " with ID " + roomID
+                );
+            }
 
-            // Reduce inventory
-            if (roomType.equalsIgnoreCase("Standard")) standardRooms--;
-            if (roomType.equalsIgnoreCase("Deluxe")) deluxeRooms--;
-            if (roomType.equalsIgnoreCase("Suite")) suiteRooms--;
+            // Perform rollback
+            reservations.remove(toCancel);
+            cancelledRoomIDs.push(toCancel.getRoomID());
 
-            System.out.println("Booking confirmed: " + reservation);
+            // Restore inventory
+            inventory.put(toCancel.getRoomType(), inventory.get(toCancel.getRoomType()) + 1);
 
-        } catch (InvalidBookingException e) {
-            // Graceful error handling
-            System.out.println("Booking failed: " + e.getMessage());
+            System.out.println("Booking cancelled successfully: " + toCancel);
+        } catch (InvalidCancellationException e) {
+            System.out.println(e.getMessage());
         }
     }
 
+    // Print current bookings
     public void printReservations() {
         System.out.println("\n--- Current Bookings ---");
         if (reservations.isEmpty()) {
-            System.out.println("No bookings yet.");
+            System.out.println("No active bookings.");
         } else {
             for (Reservation r : reservations) {
                 System.out.println(r);
+            }
+        }
+    }
+
+    // Print cancelled room stack
+    public void printCancelledRooms() {
+        System.out.println("\n--- Recently Cancelled Room IDs ---");
+        if (cancelledRoomIDs.isEmpty()) {
+            System.out.println("No cancellations yet.");
+        } else {
+            for (String id : cancelledRoomIDs) {
+                System.out.println(id);
             }
         }
     }
@@ -92,18 +128,20 @@ class BookingSystem {
 // Main class
 public class BookMyStayApp {
     public static void main(String[] args) {
-        BookingSystem system = new BookingSystem(2, 1, 1); // Sample inventory
+        BookingSystem system = new BookingSystem(2, 1, 1);
 
-        Scanner sc = new Scanner(System.in);
-        System.out.println("Welcome to Book My Stay App");
-
-        // Example bookings
+        // Add some reservations
         system.addReservation("Alice", "Deluxe");
-        system.addReservation("", "Standard"); // Invalid guest name
-        system.addReservation("Bob", "Premium"); // Invalid room type
+        system.addReservation("Bob", "Standard");
         system.addReservation("Charlie", "Standard");
-        system.addReservation("Dave", "Standard"); // Should fail, inventory exhausted
+
+        // Cancel a reservation
+        system.cancelReservation("Bob", "S2"); // Undo last Standard booking
+
+        // Attempt invalid cancellation
+        system.cancelReservation("Dave", "S3"); // No such booking
 
         system.printReservations();
+        system.printCancelledRooms();
     }
 }
