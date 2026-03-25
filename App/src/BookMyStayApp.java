@@ -4,76 +4,48 @@ public class BookMyStayApp {
 
     public static void main(String[] args) {
 
-        // 🔹 Inventory (Room Type → Available Count)
-        HashMap<String, Integer> inventory = new HashMap<>();
-        inventory.put("Single Room", 2);
-        inventory.put("Double Room", 1);
-        inventory.put("Suite Room", 1);
+        // 🔹 Existing Reservations (from UC6 simulation)
+        List<String> reservations = new ArrayList<>();
+        reservations.add("SI1");
+        reservations.add("DO2");
+        reservations.add("SU3");
 
-        // 🔹 Booking Request Queue (FIFO)
-        Queue<String> bookingQueue = new LinkedList<>();
-        bookingQueue.add("Single Room");
-        bookingQueue.add("Double Room");
-        bookingQueue.add("Single Room");
-        bookingQueue.add("Suite Room");
-        bookingQueue.add("Single Room"); // extra request (to test limit)
+        // 🔹 Add-On Services (Service → Cost)
+        HashMap<String, Integer> serviceCatalog = new HashMap<>();
+        serviceCatalog.put("Breakfast", 500);
+        serviceCatalog.put("WiFi", 200);
+        serviceCatalog.put("Airport Pickup", 1000);
 
-        // 🔹 Allocated Room Tracking
-        Set<String> allocatedRoomIds = new HashSet<>();
+        // 🔹 Reservation → List of Services
+        HashMap<String, List<String>> reservationServices = new HashMap<>();
 
-        // 🔹 Room Type → Assigned Room IDs
-        HashMap<String, Set<String>> allocationMap = new HashMap<>();
+        System.out.println("===== Add-On Service Selection =====\n");
 
-        System.out.println("===== Processing Bookings =====\n");
+        // 🔹 Guest selects services
+        reservationServices.put("SI1", new ArrayList<>(Arrays.asList("Breakfast", "WiFi")));
+        reservationServices.put("DO2", new ArrayList<>(Arrays.asList("Airport Pickup")));
+        reservationServices.put("SU3", new ArrayList<>(Arrays.asList("Breakfast", "Airport Pickup")));
 
-        int roomCounter = 1;
+        // 🔹 Display services + calculate cost
+        for (String reservationId : reservationServices.keySet()) {
 
-        // 🔹 Process Queue (FIFO)
-        while (!bookingQueue.isEmpty()) {
+            List<String> services = reservationServices.get(reservationId);
+            int totalCost = 0;
 
-            String roomType = bookingQueue.poll();
-            int available = inventory.getOrDefault(roomType, 0);
+            System.out.println("Reservation ID: " + reservationId);
+            System.out.println("Selected Services:");
 
-            System.out.println("Processing request for: " + roomType);
+            for (String service : services) {
+                int cost = serviceCatalog.get(service);
+                totalCost += cost;
 
-            // Check availability
-            if (available > 0) {
-
-                // Generate unique room ID
-                String roomId = roomType.substring(0, 2).toUpperCase() + roomCounter++;
-
-                // Ensure uniqueness using Set
-                if (!allocatedRoomIds.contains(roomId)) {
-
-                    allocatedRoomIds.add(roomId);
-
-                    // Store allocation per room type
-                    allocationMap.putIfAbsent(roomType, new HashSet<>());
-                    allocationMap.get(roomType).add(roomId);
-
-                    // Decrement inventory immediately
-                    inventory.put(roomType, available - 1);
-
-                    System.out.println("✅ Booking Confirmed | Room ID: " + roomId);
-                }
-
-            } else {
-                System.out.println("❌ Booking Failed | No rooms available");
+                System.out.println("- " + service + " (₹" + cost + ")");
             }
 
+            System.out.println("Total Add-On Cost: ₹" + totalCost);
             System.out.println();
         }
 
-        // 🔹 Final Allocation Summary
-        System.out.println("===== Allocation Summary =====");
-        for (String type : allocationMap.keySet()) {
-            System.out.println(type + " → " + allocationMap.get(type));
-        }
-
-        // 🔹 Remaining Inventory
-        System.out.println("\n===== Remaining Inventory =====");
-        for (String type : inventory.keySet()) {
-            System.out.println(type + " → " + inventory.get(type));
-        }
+        System.out.println("===== End of Add-On Services =====");
     }
 }
